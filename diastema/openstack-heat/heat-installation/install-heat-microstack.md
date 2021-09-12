@@ -2,7 +2,7 @@
 
 This .md file is made in a time that Heat is not one of the version services that are implemented in the MicroStack version of OpenStack [1]. This is also a on the wishlist for the MicroStack project, but it is not yet in on-progress phase.
 
-This .md file will show how to install the Heat Services in the MicroStack project. This guide is for the ubuntu OS. To install MicroStack use the guide here [2]
+This .md file will show how to install the Heat Services in the MicroStack project. This guide is for the ubuntu OS. To install MicroStack use the guide here [2].
 
 # Log in your MicroStack MySQL DB 
 Go to the MySQL database made by your MicroStack project
