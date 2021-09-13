@@ -136,7 +136,7 @@ user_domain_name = default
 auth_uri = http://<ip>:5000/v3/
 ```
 
-# Populate rchestration DB
+# Populate Orchestration DB
 Make sure you are still using root privileges and do the following:
 ```
 su -s /bin/sh -c "heat-manage db_sync" heat
