@@ -169,7 +169,7 @@ sudo vi admin-openrc
 # KeYst0ne is the keystone password
 # <ip> is your own ip
 ```
-Insert the following lines:
+Insert the following lines and save your file:
 ```
 export OS_PROJECT_DOMAIN_NAME=Default
 export OS_USER_DOMAIN_NAME=Default
@@ -177,6 +177,18 @@ export OS_PROJECT_NAME=admin
 export OS_USERNAME=admin
 export OS_PASSWORD=KeYst0ne
 export OS_AUTH_URL=http://<ip>:5000/v3/
+```
+After the above you should reboot your machine.
+
+# After the reboot
+Now every time that you want to run any openstack commands, you have to run first the following command in the directory that you put the admin-openrc file:
+```
+. admin-openrc
+```
+After that, you can use heat commands like:
+```
+openstack stack list
+#It is ok if does not output nothing while not having any stacks
 ```
 
 # Documentation used
