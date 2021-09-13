@@ -74,12 +74,87 @@ X-Auth-Token : t0ken
 Now send the call, it will return you the stacks of your project.
 
 # Use a template
+- Make a Test stack call
 In the Heat APIs you can give a JSON Heat template and make a stack right away!
 
-// TODO: finish this sections with example calls
+The following values can be found through your OpenStack Horizon Dashboard [[4]](https://github.com/karamolegkos/Diastema/blob/main/diastema/openstack-heat/heat-apis/use-heat-apis.md#references).
+```
+<ssh-key> = The key for your image (only the name of it)
+<network-id> = The id of the network that you want your image to be launched on.
+```
+The call that you want, must be the following, based on the OpenStack Heat API documentation [[1]](https://github.com/karamolegkos/Diastema/blob/main/diastema/openstack-heat/heat-apis/use-heat-apis.md#references).
+```
+Method: POST
+URL: http://<ip>:8004/v1/<project_id>/stacks
+```
+Do not forget to include the header below to your call:
+```
+X-Auth-Token : t0ken
+```
+The body of the call, needs to be like this:
+```json
+{
+    "files": {},
+    "disable_rollback": true,
+    "parameters": {
+        "flavor": "m1.tiny"
+    },
+    "stack_name": "reststack",
+    "template": {
+        "heat_template_version": "2013-05-23",
+        "description": "Simple template to test heat commands",
+        "parameters": {
+            "flavor": {
+                "default": "m1.tiny",
+                "type": "string"
+            }
+        },
+        "resources": {
+            "hello_world": {
+                "type": "OS::Nova::Server",
+                "properties": {
+                    "key_name": "<ssh-key>",
+                    "flavor": {
+                        "get_param": "flavor"
+                    },
+                    "image": "cirros",
+                    "networks": [{
+                        "network" : "<network-id>"
+                    }]
+                }
+            }
+        }
+    },
+    "timeout_mins": 60
+}
+```
+Now send the call. It will make your stack inside your project.
+Then, you can list it with the Rest API shown in the [Make a Heat test call](https://github.com/karamolegkos/Diastema/blob/main/diastema/openstack-heat/heat-apis/use-heat-apis.md#make-a-heat-test-call) section.
 
+You can also view your stack with the Command Line Interface (CLI) commands or throuth the OpenStack Horizon dashboard.
+
+# Delete a stack
+- Delete a stack using REST APIs
+The stack named '**reststack**' is now having an id, you will get this id after listing your stacks. From now on:
+```
+<stack-id> = The id of the reststack stack
+```
+Let's say that you want your stack to be removed. You will need to do the following call:
+```
+Method: DELETE
+URL: http://<ip>:8004/v1/<project_id>/stacks
+http://<ip>:8004/v1/<project_id>/stacks/reststack/<stack-id>
+```
+Do not forget to include the header below to your call:
+```
+X-Auth-Token : t0ken
+```
+There should not be a body in this call!
+
+Now send the call. It should remove the '**reststack**' stack.
 
 # References
 - [1] https://docs.openstack.org/api-ref/orchestration/
 - [2] https://www.postman.com/
 - [3] https://docs.openstack.org/api-quick-start/api-quick-start.html
+- [4] https://docs.openstack.org/horizon/latest/
