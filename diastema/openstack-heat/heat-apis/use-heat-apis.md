@@ -3,7 +3,7 @@ This guide will analyze how to contact with the Heat APIs [1] using the OpenStac
 
 I made this guide using MicroStack but the following should work on all versions of OpenStack.
 
-The examples below will be using the Postman API Platform [[2]](https://github.com/karamolegkos/Diastema/blob/main/diastema/openstack-heat/heat-installation/use-heat-apis.md#references).
+The examples below will be using the Postman API Platform [[2]](https://github.com/karamolegkos/Diastema/blob/main/diastema/openstack-heat/heat-apis/use-heat-apis.md#references).
 
 # Authentication
 To use the API Server we need first to authenticate using the OpenStack Keystone Service. For this, we need to follow the Authentication and API request workflow [3].
