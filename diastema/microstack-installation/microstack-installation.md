@@ -41,7 +41,14 @@ Then finish the installations with the commands below:
 sudo iptables -t nat -A POSTROUTING -s 10.20.20.1/24 ! -d 10.20.20.1/24 -j MASQUERADE
 sudo sysctl net.ipv4.ip_forward=1
 ```
-! The last two commands msut run on start-up because they will reset after any reboot !
+! The last two commands must run on start-up because they will reset after any reboot !
+
+Also after a reboot run the following:
+```
+sudo iptables -P INPUT ACCEPT
+sudo iptables -P FORWARD ACCEPT
+sudo iptables -P OUTPUT ACCEPT
+```
 
 # Important
 You can access OpenStack Horizon (The OpenStack Dashboard) through your browser in the URL: http://10.20.20.1/ .
