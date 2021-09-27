@@ -2,37 +2,57 @@ from flask import Flask, request, jsonify, Response
 import requests
 import json
 
+""" Global variables """
+# The name of the flask app
 app = Flask(__name__)
 
-### Functions used for the json handling ###
+# Diastema Token
+diastema_token = "diastema-key"
+
+# Kubernetes API URL to call spark jobs
+kubernetes_api_url = "http://10.20.20.205:443/api"
+
+""" Functions to call a spark job """
 # A call for a data load job
-def data_load(data_set_name, client_name, data_set_files):
+def data_load(data_set_name, client_name, all_files, data_set_files):
     """
+    Makes the API call to the data load service.
+    
     Args: 
         - data_set_name (String) : The name of the dataset for the data load operation.
         - client_name (String) : The name of the client for the data load operation.
-        - data_set_files (Dictionary) : The files to send to the data load service.
+        - all_files (Dictionary) : All the files given to the diastema playbook.
+        - data_set_files (List) : The files to send to the data load service.
     
     Returns:
         - The MongoDB ID for the next job, given by the Data Load job
     """
-    print("Data Loaded")
-    # Print files from dictionary
-    for filename, file in data_set_files.items():
-        print(filename, "-", file, ":")
-        lines = file.readlines()
-        for line in lines:
-            print(line)
+    # data-load query parameters.
+    query_parameters = "?data-set="+data_set_name+"&"+"client-name="+client_name
     
+    # Find the files to send to the data-load service.
+    listOfFiles = []
+    for file in data_set_files:
+        lines = all_files[file].readlines()
+        # Make a file in memory from the given file to send it for the data-load
+        myFile = (all_files[file].name, (all_files[file].filename, b''.join(lines), all_files[file].mimetype))
+        # Hold the file untill you send it.
+        listOfFiles.append(myFile)
     
-    # REMEMBER THAT THERE CAN BE MORE THAN ONE DATA LOAD JOBS
-    # AND YOU MUST USE SEND THE NEEDED FILE FOR EACH ONE
+    # Make the API call
+    # Due to spark calls not being ready, this is a dummy call.
+    dummy_host = "http://localhost:5000/dummy-data-load"
+    api_call = dummy_host+query_parameters
+    response = requests.post(api_call, files=listOfFiles)
+    #print(response.content)
     
-    return "A TEST MONGO DB ID 1"
+    return bytes.decode(response.content ) 
 
 # A call for a data cleaning job
 def cleaning(mongodb_dataset_id, max_shrink="false", json_schema="false"):
     """
+    Makes the API call to the data cleaning service.
+    
     Args: 
         - mongodb_dataset_id (String) : The MongoDB ID of the last job's output
         - max_shrink (Float) : The pressentage of shrinking to be done on the dataset.
@@ -41,12 +61,32 @@ def cleaning(mongodb_dataset_id, max_shrink="false", json_schema="false"):
     Returns:
         - The MongoDB ID for the next job, given by the Data Cleaning job
     """
-    print("Data Cleaned")
-    return "A TEST MONGO DB ID 2"
+    # data-cleaning query parameters.
+    query_parameters = ""
+    if max_shrink == "false":
+        query_parameters = "?mongodb-id="+mongodb_dataset_id+"&"+"max-shrink="+max_shrink
+    else:
+        query_parameters = "?mongodb-id="+mongodb_dataset_id+"&"+"max-shrink="+str(max_shrink)
+    
+    # Make the API call
+    # Due to spark calls not being ready, this is a dummy call.
+    dummy_host = "http://localhost:5000/dummy-cleaning"
+    api_call = dummy_host+query_parameters
+    
+    response = ""
+    
+    if json_schema == "false":
+        response = requests.post(api_call)
+    else:
+        response = requests.post(api_call, json={'json-schema': json_schema})
+    
+    return bytes.decode(response.content ) 
     
 # A call for a data classification job
 def classification(mongodb_dataset_id, column, algorithm="false", tensorfow_algorithm="false"):
     """
+    Makes the API call to the data classification service.
+    
     Args: 
         - mongodb_dataset_id (String) : The MongoDB ID of the last job's output
         - algorithm (String) : The classification algorithm to use in the Service.
@@ -56,58 +96,89 @@ def classification(mongodb_dataset_id, column, algorithm="false", tensorfow_algo
     Returns:
         - The MongoDB ID for the next job, given by the Data Classification job
     """
-    print("Data Classified")
-    return "A TEST MONGO DB ID 3"
+    # data-classification query parameters.
+    query_parameters = "?mongodb-id="+mongodb_dataset_id+"&"+"algorithm="+algorithm+"&"+"column="+column
+    
+    # Make the API call
+    # Due to spark calls not being ready, this is a dummy call.
+    dummy_host = "http://localhost:5000/dummy-classification"
+    api_call = dummy_host+query_parameters
+    
+    response = ""
+    
+    if tensorfow_algorithm == "false":
+        response = requests.post(api_call)
+    else:
+        response = requests.post(api_call, json={'tensorfow-algorithm': tensorfow_algorithm})
+    
+    return bytes.decode(response.content ) 
     
 # A call for a data regression job
 def regression(mongodb_dataset_id, column, algorithm="false", tensorfow_algorithm="false"):
     """
+    Makes the API call to the data regression service.
+    
     Args: 
-        - mongodb_dataset_id (String) : The MongoDB ID of the last job's output
-        - algorithm (String) : The classification algorithm to use in the Service.
-        - column (String) : The column to do the classification on, with the called job.
+        - mongodb_dataset_id (String) : The MongoDB ID of the last job's output.
+        - algorithm (String) : The Regression algorithm to use in the Service.
+        - column (String) : The column to do the regression on, with the called job.
         - tensorfow_algorithm (Not Specified) : Jupiter Notebook Custom Algorithm or Neural Network Architecture.
     
     Returns:
         - The MongoDB ID for the next job, given by the Data Regression job
     """
-    print("Data Regressed")
-    return "A TEST MONGO DB ID 4"
+    # data-regression query parameters.
+    query_parameters = "?mongodb-id="+mongodb_dataset_id+"&"+"algorithm="+algorithm+"&"+"column="+column
+    
+    # Make the API call
+    # Due to spark calls not being ready, this is a dummy call.
+    dummy_host = "http://localhost:5000/dummy-regression"
+    api_call = dummy_host+query_parameters
+    
+    response = ""
+    
+    if tensorfow_algorithm == "false":
+        response = requests.post(api_call)
+    else:
+        response = requests.post(api_call, json={'tensorfow-algorithm': tensorfow_algorithm})
+    
+    return bytes.decode(response.content ) 
     
 # A call for a data visualize job
 def visualize(mongodb_dataset_id):
     """
+    Sends a call to the Front-End, informing it that a visualization is ready.
+    
     Args: 
         - mongodb_dataset_id (String) : The MongoDB ID of the last job's output
     
     Returns:
         - Nothing
-    
-    Description:
-        Sends a call to the Front-End, informing it that a visualization is ready.
     """
-    print("Data Visualized")
-    return "A TEST MONGO DB ID 5"
+    print("There has not been any confirmation of what to give to the front-end yet!")
+    return "DATA-VISUALIZATION-MONGO-ID"
 
+""" Functions used for the json handling """
+# Request a job
 def job_requestor(job_json, files_dict, jobs_anwers_dict, collection):
     """
+    Makes the request of a job (the json given is the job), using the above functions.
+    
     Args: 
         - job_json (JSON) : The job to be requested.
         - files_dict (Dictionary) : Possible files to be used in the job request.
-        - jobs_anwers_dict ("Dictionary") : All the answers of the jobs getting handled.
+        - jobs_anwers_dict (Dictionary) : All the answers of the jobs getting handled.
+        - collection (String): The name of the collection to use for a data-load job.
     
     Returns:
-        - Nothing
-    
-    Description:
-        Makes the request of a job (the json given is the job).
+        - Nothing.
     """
     title = job_json["title"]
     step = job_json["step"]
     from_step = job_json["from"]
     
     if(title == "data-load"):
-        jobs_anwers_dict[step] = data_load(job_json["dataset-name"], collection, files_dict)
+        jobs_anwers_dict[step] = data_load(job_json["dataset-name"], collection, files_dict, job_json["files"])
     
     if(title == "cleaning"):
         jobs_anwers_dict[step] = cleaning(jobs_anwers_dict[from_step], max_shrink = job_json["max-shrink"])
@@ -123,37 +194,48 @@ def job_requestor(job_json, files_dict, jobs_anwers_dict, collection):
     
     return
 
-# Access jobs by viewing them Depth-first
+# Access jobs by viewing them Depth-first O(N)
 def jobs(job_step, jobs_dict, files, jobs_anwers_dict, collection):
-    # Print that this function did this job step 
-    # print(job_step)
+    """
+    A recursive function to access in a depth-first way all the jobs of a json analysis object.
     
-    # make the job request
+    Args:
+        - job_step (Int): The job that called this function.
+        - jobs_dict (Dictionary): All the jobs of the given analysis.
+        - files (Dictionary): All the files for the data-loading jobs.
+        - jobs_anwers_dict (Dictionary): A dictionary containing all the answers of each job request.
+        - collection (String): The name of the collection to use for the data-load jobs.
+    
+    Returns:
+        - Nothing.
+    """
+    # Make the job request
     job_requestor(jobs_dict[job_step], files, jobs_anwers_dict, collection)
     
     # Depth-first approach
     next_steps = jobs_dict[job_step]["next"]
     for step in next_steps:
-        if(step != 0):  # if ther is no next job then stop recursive
+        if(step != 0):  # If ther is no next job then do not try to go deeper
             jobs(step, jobs_dict, files, jobs_anwers_dict, collection)
     return
-    
 
-# Function to handle all the jobs of one analysis
-# Gets the the jobs list from the form-data of the call
-# Gets the files needed for the data loading jobs
+# Handle the playbook
 def handler(json_jobs, collection, raw_files):
+    """
+    Handle all the jobs of one analysis.
+    
+    Args:
+        - json_jobs (JSON): All the jobs of a diastema analysis.
+        - collection (String): The collection name to use for the data-loading jobs.
+        - raw_files (List): Files given by the front-end to use as data-load. 
+        
+    Returns:
+        - Nothing.
+    """
     # Handle files as a dictionary - O(N)
     files = {}
     for file in raw_files:
         files[file] = raw_files[file]
-    
-    # Print files from dictionary
-    #for filename, file in files.items():
-    #    print(filename, "-", file, ":")
-    #    lines = file.readlines()
-    #    for line in lines:
-    #        print(line)
     
     # handle jobs as a dictionary - O(N)
     jobs_dict = {}
@@ -168,7 +250,7 @@ def handler(json_jobs, collection, raw_files):
             starting_jobs.append(job_step)
     #print(starting_jobs)
     
-    # Use a dictionary as a storage for the each job answer
+    # Use a dictionary as a storage for each job answer
     jobs_anwers_dict = {}
     
     # for each starting job, start the analysis
@@ -181,76 +263,56 @@ def handler(json_jobs, collection, raw_files):
     for job_step, answer in jobs_anwers_dict.items():
         print(job_step, '->', answer)
     
-    return "handled"
+    return
 
-### FLASK ENDPOINTS ###
-@app.route("/test1", methods=["POST"])
-def test1():
-    print("DEBUGGING ##########################")
+""" Flask endpoints """
+# An endpoint for handling and using the JSON playbook
+@app.route("/analysis", methods=["POST"])
+def analysis():
+    """
+    This functions is used as the endpoint for the orchestration of each analysis is needed to be done
+    form the Diastema users.
     
-    # Get and print valuable stuff about the files in a give form-data body
-    # of a POST request
+    It will give feedback to the sedner to specify if the analysis is done correctly.
     
-    # Get all the given files
+    Args: 
+        Even if the function itself is not getting any arguments, it is using the form-data given by the 
+        API call sender. This form data is specified below:
+        - json-playbook (JSON) : A JSON reprecentation of the jobs to run.
+        - files (file): Keys that have file values to get handled by the orchestrator.
+    
+    Returns:
+        - Information about the status of the jobs given for execution.
+    """
+    # Get the JSON from the form-data
+    playbook = json.loads(request.form["json-playbook"])
+    
+    # Here there will probably be code to check the whole json
+    # To return if there is a bad request
+    
+    # Check Diastema token
+    if playbook["diastema-token"] != diastema_token:
+        return Response('{"reason": "diastema token is wrong"}', status=401, mimetype='application/json')
+    
+    # Get all the given files from the form-data
     files = request.files
-    # For each file
-    for file in files:
-        # Print file's key name : File's real name
-        print(file,":",files[file])
-        # Print file's content
-        # YOU CAN PRINT THE FILES ONLY ONCE
-        # lines = files[file].readlines()
-        # print(lines)
-        # print(b''.join(lines))
-        # for line in lines:
-        #     print(line)
     
-    # Get and print valuable stuff about the keys in a give form-data body
-    # of a POST request
+    # Send the playbook for handling
+    handler(playbook["jobs"], playbook["collection-id"], files)
     
-    # Get the form-data
-    form = request.form
-    # For each key in the form-data
-    for key in form.keys():
-        # Print the value of this key
-        for value in form.getlist(key):
-            print (key,":",value)
-    
-    # test request to an other API endpoint
-    # response = requests.get("http://localhost:5000/test2")
-    
-    # test request to an endpoint that will get the passed files
-    url = "http://localhost:5000/test3"
-    # Send one file after making its content
-    # files = {'file': ('report.csv', 'some,data,to,send\nanother,row,to,send\n')}
-    
-    # Send multiple files after making their content
-    # files = [('file1', ('report1.csv', 'some,data,to,send\nanother,row,to,send\n')),
-    #         ('file2', ('report2.csv', 'some,data,to,send\nanother,row,to,send\n'))]
-    
-    # Send all the files got by THIS endpoint
-    # List for all the files to send
-    listOfFiles = []
-    for file in files:
-        # Put the files in the memory
-        lines = files[file].readlines()
-        # Make a temp file with all the right attributes and byte data as content and append it in the list
-        myFile = (files[file].name, (files[file].filename, b''.join(lines), files[file].mimetype))
-        listOfFiles.append(myFile)
-    
-    # Make the API call
-    response = requests.post(url, files=listOfFiles)
-    
-    print("DEBUGGING END ##########################")
-    return response.content
+    # The analysis has been accepted
+    return Response(status=202)
 
-@app.route("/test2", methods=["GET"])
-def test2():
-    return "hello from test2"
+""" Flask endpoints - Dummy Endpoints """
+# Dummy data-load endpoint for testing purposes
+@app.route("/dummy-data-load", methods=["POST"])
+def dummy_data_load():
+    data_set = request.args.get('data-set')
+    client_name = request.args.get('client-name')
+    print("The below data got send to the DATA LOADING service:")
+    print("Dataset:",data_set)
+    print("Client:",client_name)
     
-@app.route("/test3", methods=["POST"])
-def test3():
-    print("You gave at the test3 endpoint")
     # Get all the given files
     files = request.files
     # For each file
@@ -261,39 +323,57 @@ def test3():
         lines = files[file].readlines()
         for line in lines:
             print(line)
-    return "good job"
+    print()
+    
+    return "DATA-LOAD-MONGO-ID"
 
-# An endpoint to use the JSON playbook
-@app.route("/analysis", methods=["POST"])
-def analysis():
-    # Get the JSON from the form data
-    playbook = json.loads(request.form["json-playbook"])
+# Dummy cleaning endpoint for testing purposes
+@app.route("/dummy-cleaning", methods=["POST"])
+def dummy_cleaning():
+    mongodb_id = request.args.get('mongodb-id')
+    max_shrink = request.args.get('max-shrink')
+    data = request.json
+    print("The below data got send to the DATA CLEANING service:")
+    print("MongoDB ID:",mongodb_id)
+    print("Max Shrink:",max_shrink)
+    print("Raw Data:",data)
+    print()
     
-    # print given diastema-token
-    #print(playbook["diastema-token"])
-    
-    # print given analysis-id
-    #print(playbook["analysis-id"])
-    
-    # print given analysis-datetime
-    #print(playbook["analysis-datetime"])
-    
-    # print given jobs
-    # print(playbook["jobs"])
-    
-    # print the first given job
-    # print(playbook["jobs"][0])
-    
-    # Get all the given files
-    files = request.files
-    
-    # Send the playbook for handling
-    jobs_handler = handler(playbook["jobs"], playbook["collection-id"], files)
-    #print(jobs_handler)
-    
-    
-    # Response('{"Got analysis": true}', status=202, mimetype='application/json')
-    return Response(status=202)
+    return "DATA-CLEANING-MONGO-ID"
 
+# Dummy classification endpoint for testing purposes
+@app.route("/dummy-classification", methods=["POST"])
+def dummy_classification():
+    mongodb_id = request.args.get('mongodb-id')
+    algorithm = request.args.get('algorithm')
+    column = request.args.get('column')
+    data = request.json
+    print("The below data got send to the DATA CLASSIFICATION service:")
+    print("MongoDB ID:",mongodb_id)
+    print("Algorithm:",algorithm)
+    print("Column:",column)
+    print("Raw Data:",data)
+    print()
+    
+    return "DATA-CLASSIFICATION-MONGO-ID"
+
+# Dummy regression endpoint for testing purposes
+@app.route("/dummy-regression", methods=["POST"])
+def dummy_regression():
+    mongodb_id = request.args.get('mongodb-id')
+    algorithm = request.args.get('algorithm')
+    column = request.args.get('column')
+    data = request.json
+    print("The below data got send to the DATA REGRESSION service:")
+    print("MongoDB ID:",mongodb_id)
+    print("Algorithm:",algorithm)
+    print("Column:",column)
+    print("Raw Data:",data)
+    print()
+    
+    return "DATA-REGRESSION-MONGO-ID"
+
+""" Main """
+# Main code
 if __name__ == "__main__":
     app.run(debug=True)
