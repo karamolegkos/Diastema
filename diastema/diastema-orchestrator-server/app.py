@@ -231,12 +231,13 @@ def cleaning(playbook, job, last_bucket, max_shrink=False, json_schema=False):
 def classification(playbook, job, last_bucket, algorithm=False, tensorfow_algorithm=False):
     # All the available spark classfication jobs 
     spark_files = {
-        "Logistic regression" : "/root/spark-job/classification-job-1.py",
-        "Decision tree classifier" : "/root/spark-job/classification-job-2.py",
-        "Random forest classifier" : "/root/spark-job/classification-job-3.py",
-        "Gradient-boosted tree classifier" : "/root/spark-job/classification-job-4.py",
-        "Multilayer perceptron classifier" : "/root/spark-job/classification-job-5.py",
-        "Linear Support Vector Machine" : "/root/spark-job/classification-job-6.py"
+        "logistic regression" : "/root/spark-job/classification-job-1.py",
+        "decision tree classifier" : "/root/spark-job/classification-job-2.py",
+        "random forest classifier" : "/root/spark-job/classification-job-3.py",
+        "gradient-boosted tree classifier" : "/root/spark-job/classification-job-4.py",
+        "multilayer perceptron classifier" : "/root/spark-job/classification-job-5.py",
+        "linear support vector machine" : "/root/spark-job/classification-job-6.py",
+        "support vector machine" : "/root/spark-job/classification-job-7.py"
     }
 
     # Gget the spark algorithm to run
@@ -262,6 +263,9 @@ def classification(playbook, job, last_bucket, algorithm=False, tensorfow_algori
     # Make the Spark call
     spark_caller(job_args)
 
+    # Remove the _SUCCESS file from the  spark job results
+    minio_client.remove_object(minioString(playbook["database-id"]), "analysis-"+minioString(playbook["analysis-id"])+"/classified-"+minioString(job["step"])+"/_SUCCESS")
+
     # Insert the classified data in MongoDB
     classification_job_record = {"minio-path":analysis_bucket, "directory-kind":"classified-data", "job-json":job}
     insertMongoRecord(minioString(playbook["database-id"]), "analysis_"+minioString(playbook["analysis-id"]), classification_job_record)
@@ -276,11 +280,11 @@ def classification(playbook, job, last_bucket, algorithm=False, tensorfow_algori
 def regression(playbook, job, last_bucket, algorithm=False, tensorfow_algorithm=False):
     # All the available spark regression jobs 
     spark_files = {
-        "Linear regression" : "/root/spark-job/regression-job-1.py",
-        "Generalized linear regression" : "/root/spark-job/regression-job-2.py",
-        "Decision tree regression" : "/root/spark-job/regression-job-3.py",
-        "Random forest regression" : "/root/spark-job/regression-job-4.py",
-        "Gradient-boosted tree regression" : "/root/spark-job/regression-job-5.py"
+        "linear regression" : "/root/spark-job/regression-job-1.py",
+        "generalized linear regression" : "/root/spark-job/regression-job-2.py",
+        "decision tree regression" : "/root/spark-job/regression-job-3.py",
+        "random forest regression" : "/root/spark-job/regression-job-4.py",
+        "gradient-boosted tree regression" : "/root/spark-job/regression-job-5.py"
     }
 
     # Get the spark algorithm to run
@@ -305,6 +309,9 @@ def regression(playbook, job, last_bucket, algorithm=False, tensorfow_algorithm=
     # Make the Spark call
     spark_caller(job_args)
 
+    # Remove the _SUCCESS file from the  spark job results
+    minio_client.remove_object(minioString(playbook["database-id"]), "analysis-"+minioString(playbook["analysis-id"])+"/regressed-"+minioString(job["step"])+"/_SUCCESS")
+
     # Insert the regressed data in MongoDB
     regression_job_record = {"minio-path":analysis_bucket, "directory-kind":"regressed-data", "job-json":job}
     insertMongoRecord(minioString(playbook["database-id"]), "analysis_"+minioString(playbook["analysis-id"]), regression_job_record)
@@ -319,11 +326,11 @@ def regression(playbook, job, last_bucket, algorithm=False, tensorfow_algorithm=
 def clustering(playbook, job, last_bucket, algorithm=False, tensorfow_algorithm=False):
     # All the available spark clustering jobs 
     spark_files = {
-        "Linear regression" : "/root/spark-job/clustering-job-1.py",
-        "Generalized linear regression" : "/root/spark-job/clustering-job-2.py",
-        "Decision tree regression" : "/root/spark-job/clustering-job-3.py",
-        "Random forest regression" : "/root/spark-job/clustering-job-4.py",
-        "Gradient-boosted tree regression" : "/root/spark-job/clustering-job-5.py"
+        "k-means clustering" : "/root/spark-job/clustering-job-1.py",
+        "generalized linear regression" : "/root/spark-job/clustering-job-2.py",
+        "decision tree regression" : "/root/spark-job/clustering-job-3.py",
+        "random forest regression" : "/root/spark-job/clustering-job-4.py",
+        "gradient-boosted tree regression" : "/root/spark-job/clustering-job-5.py"
     }
 
     # Get the spark algorithm to run
@@ -347,6 +354,9 @@ def clustering(playbook, job, last_bucket, algorithm=False, tensorfow_algorithm=
 
     # Make the Spark call
     spark_caller(job_args)
+
+    # Remove the _SUCCESS file from the  spark job results
+    minio_client.remove_object(minioString(playbook["database-id"]), "analysis-"+minioString(playbook["analysis-id"])+"/clustered-"+minioString(job["step"])+"/_SUCCESS")
 
     # Insert the clustered data in MongoDB
     clustering_job_record = {"minio-path":analysis_bucket, "directory-kind":"clustered-data", "job-json":job}
@@ -533,6 +543,16 @@ def submissions_create():
         print("This is not a loading job!")
         #print("Data got from:",data["appArgs"][1])
         #print("Data analyzed to:",data["appArgs"][2])
+
+    # Spark jobs are outputting a _SUCCESS file after their jobs
+    minio_path  = data["appArgs"][2].split("/")
+    minio_bucket = minio_path[0]
+    del minio_path[0]
+    minio_object = '/'.join([str(elem) for elem in minio_path])
+    minio_success_object = minio_object + "/_SUCCESS"
+    minio_results_object = minio_object + "/results.txt"
+    minio_client.put_object(minio_bucket, minio_success_object, io.BytesIO(b""), 0)
+    minio_client.put_object(minio_bucket, minio_results_object, io.BytesIO(b"results"), 7)
 
     return Response(result_json, status=200, mimetype='application/json')
 
