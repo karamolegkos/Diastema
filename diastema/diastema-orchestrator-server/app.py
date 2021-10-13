@@ -1,8 +1,9 @@
-from flask import Flask, request, jsonify, Response
+import os
+import io
 import requests
 import json
 import random   # for dummy results
-import io
+from flask import Flask, request, jsonify, Response
 from minio import Minio
 from pymongo import MongoClient
 
@@ -34,38 +35,70 @@ from pymongo import MongoClient
 #                     |- Analysis-1-3
 #                     |- Analysis-2-1
 
+""" Environment Variables """
+# Flask app Host and Port
+HOST = os.getenv("HOST", "0.0.0.0")
+PORT = int(os.getenv("PORT", 5000))
+
+# MinIO Host, Port and user details
+MINIO_HOST = os.getenv("MINIO_HOST", "localhost")
+MINIO_PORT = int(os.getenv("MINIO_PORT", 9000))
+MINIO_USER = os.getenv("MINIO_USER", "diastema")
+MINIO_PASS = os.getenv("MINIO_PASS", "diastema")
+
+# MongoDB Host and Port
+MONGO_HOST = os.getenv("MONGO_HOST", "localhost")
+MONGO_PORT = int(os.getenv("MONGO_PORT", 27017))
+
+# Diastema key
+DIASTEMA_KEY = os.getenv("DIASTEMA_KEY", "diastema-key")
+
+# Diastema Front End Host and Port
+DIASTEMA_HOST = os.getenv("DIASTEMA_HOST", "localhost")
+DIASTEMA_PORT = int(os.getenv("DIASTEMA_PORT", 5000))
+
+# Diastema Analytcs API Host and Port
+DIASTEMA_DATA_LOADING_HOST = os.getenv("DIASTEMA_DATA_LOADING_HOST", "localhost")
+DIASTEMA_DATA_LOADING_PORT = int(os.getenv("DIASTEMA_DATA_LOADING_PORT", 5000))
+DIASTEMA_DATA_CLEANING_HOST = os.getenv("DIASTEMA_DATA_CLEANING_HOST", "localhost")
+DIASTEMA_DATA_CLEANING_PORT = int(os.getenv("DIASTEMA_DATA_CLEANING_PORT", 5000))
+
+# Spark Cluster Details
+SPARK_HOST = os.getenv("SPARK_HOST", "localhost")
+SPARK_PORT = int(os.getenv("SPARK_PORT", 5000))
+
 """ Global variables """
 # The name of the flask app
 app = Flask(__name__)
 
 # Diastema Token
-diastema_token = "diastema-key"
+diastema_token = DIASTEMA_KEY
 
 # Kubernetes API HOST to call spark jobs
 kubernetes_api_host = "http://10.20.20.205:443/api"
 
 # Spark API HOST to call spark jobs
-spark_api_host = "http://localhost:5000"
+spark_api_host = "http://"+SPARK_HOST+":"+str(SPARK_PORT)
 
 # MongoDB HOST
-mongo_host = "localhost:27017"
+mongo_host = MONGO_HOST+":"+str(MONGO_PORT)
 mongo_client = MongoClient("mongodb://"+mongo_host+"/")
 
 # MinIO HOST and Client
-minio_host = "localhost:9000"
+minio_host = MINIO_HOST+":"+str(MINIO_PORT)
 minio_client = Minio(
         minio_host,
-        access_key="diastema",
-        secret_key="diastema",
+        access_key=MINIO_USER,
+        secret_key=MINIO_PASS,
         secure=False
     )
 
 # Diastema Front End host
-diastema_front_end_host = "http://localhost:5000"
+diastema_front_end_host = "http://"+DIASTEMA_HOST+":"+str(DIASTEMA_PORT)
 
 # Diastema Data Clean and Data Load Servcices
-diastema_data_loading_api_host = "http://localhost:5000/data-loading-cleaning-api"
-diastema_data_cleaning_api_host = "http://localhost:5000/data-loading-cleaning-api"
+diastema_data_loading_api_host = "http://"+DIASTEMA_DATA_LOADING_HOST+":"+str(DIASTEMA_DATA_LOADING_PORT)+"/"
+diastema_data_cleaning_api_host = "http://"+DIASTEMA_DATA_CLEANING_HOST+":"+str(DIASTEMA_DATA_CLEANING_PORT)+"/"
 
 """ Frequently used code """
 # Make a good MinIO String
@@ -199,7 +232,7 @@ def job_tester(driver):
 
 """ Spark Jobs And Diastema API Jobs """
 # Data load job
-def data_load(playbook, job, all_files, data_set_files):
+def data_load(playbook, job, data_set_files):
     """
     A function to handle a Data Loading Job from the Diastema JSON playbook.
     It will setup the folders needed for the spark jobs in the MinIO Database.
@@ -209,8 +242,7 @@ def data_load(playbook, job, all_files, data_set_files):
     Args:
         - playbook (JSON): The Diastema playbook.
         - job (JSON): The Data Loading Job from the Diastema playbook.
-        - all_files (Dictionary): All the files of the Data Loading jobs in the Diastema playbook.
-        - data_set_files (List): The files of the given Job to Data Load.
+        - data_set_files (String): The path of the Data set files.
 
     Returns:
         - MinIO path (String): The path that the loaded data are saved.
@@ -221,28 +253,8 @@ def data_load(playbook, job, all_files, data_set_files):
     # Bucket to Load Data = User/analysis-id/job-step
     load_bucket = minioString(playbook["database-id"])+"/analysis-"+minioString(playbook["analysis-id"])+"/loaded-"+minioString(job["step"])
 
-    # Jobs arguments
-    #job_args = ["/root/spark-job/load-job.py", raw_bucket, load_bucket]
-
-    # Make the Databse Bucket
-    if minio_client.bucket_exists(minioString(playbook["database-id"])) == False:
-        minio_client.make_bucket(minioString(playbook["database-id"]))
-    
-    # Make the Raw Bucket directory
-    minio_client.put_object(minioString(playbook["database-id"]), "analysis-"+minioString(playbook["analysis-id"])+"/raw-"+minioString(job["id"])+"/", io.BytesIO(b""), 0,)
-
-    #Make the load Bucket directory
+    # Make the load Bucket directory
     minio_client.put_object(minioString(playbook["database-id"]), "analysis-"+minioString(playbook["analysis-id"])+"/loaded-"+minioString(job["step"])+"/", io.BytesIO(b""), 0,)
-
-    # insert the raw files in the raw bucket
-    for file in data_set_files:
-        minio_client.put_object(
-            minioString(playbook["database-id"]), 
-            "analysis-"+minioString(playbook["analysis-id"])+"/raw-"+minioString(job["id"])+"/"+all_files[file].filename, 
-            all_files[file], 
-            length=-1, 
-            part_size=10*1024*1024
-        )
     
     # Make the API call for the Data Loading Service
     url = diastema_data_loading_api_host
@@ -534,13 +546,12 @@ def visualize(playbook, job, last_bucket):
 
 """ Functions used for the json handling """
 # Request a job
-def job_requestor(job_json, files_dict, jobs_anwers_dict, playbook):
+def job_requestor(job_json, jobs_anwers_dict, playbook):
     """
     A function to handle a Vizualization Job from the Diastema JSON playbook.
 
     Args:
         - job_json (JSON): The job to request to be done.
-        - files_dict (Dictionary): A Dictionary with every file, given by the front-end request.
         - jobs_anwers_dict (Dictionary): A dictionary holding all the return values of every 
             Diastema job done in the given analysis so far.
         - playbook (JSON): The Diastema playbook.
@@ -553,7 +564,7 @@ def job_requestor(job_json, files_dict, jobs_anwers_dict, playbook):
     from_step = job_json["from"]
     
     if(title == "data-load"):
-        jobs_anwers_dict[step] = data_load(playbook, job_json, files_dict, job_json["files"])
+        jobs_anwers_dict[step] = data_load(playbook, job_json, job_json["files"])
     
     if(title == "cleaning"):
         jobs_anwers_dict[step] = cleaning(playbook, job_json, jobs_anwers_dict[from_step], max_shrink = job_json["max-shrink"])
@@ -573,14 +584,13 @@ def job_requestor(job_json, files_dict, jobs_anwers_dict, playbook):
     return
 
 # Access jobs by viewing them Depth-first O(N)
-def jobs(job_step, jobs_dict, files, jobs_anwers_dict, playbook):
+def jobs(job_step, jobs_dict, jobs_anwers_dict, playbook):
     """
     A Depth first recursive function, running every job of the Diastema analysis.
 
     Args:
         - job_step (Integer): The step of the job to parse.
         - jobs_dict (Dictionary): A Dictionary with every job from the requests.
-        - files (Dictionary): A Dictionary with every file, given by the front-end request
         - jobs_anwers_dict (Dictionary): A dictionary holding all the return values of every 
             Diastema job done in the given analysis so far.
         - playbook (JSON): The Diastema playbook.
@@ -589,32 +599,27 @@ def jobs(job_step, jobs_dict, files, jobs_anwers_dict, playbook):
         - Nothing.
     """
     # Make the job request
-    job_requestor(jobs_dict[job_step], files, jobs_anwers_dict, playbook)
+    job_requestor(jobs_dict[job_step], jobs_anwers_dict, playbook)
     
     # Depth-first approach
     next_steps = jobs_dict[job_step]["next"]
     for step in next_steps:
         if(step != 0):  # If ther is no next job then do not try to go deeper
-            jobs(step, jobs_dict, files, jobs_anwers_dict, playbook)
+            jobs(step, jobs_dict, jobs_anwers_dict, playbook)
     return
 
 # Handle the playbook
-def handler(json_jobs, playbook, raw_files):
+def handler(json_jobs, playbook):
     """
     A function to handle and run the Diastema playbook.
 
     Args:
         - json_jobs (JSON): The jobs of the playbook.
         - playbook (JSON): The Diastema playbook.
-        - raw_files (List): A list of the given files in the Diastema playbook form data.
 
     Returns:
         - Nothing.
     """
-    # Handle files as a dictionary - O(N)
-    files = {}
-    for file in raw_files:
-        files[file] = raw_files[file]
     
     # handle jobs as a dictionary - O(N)
     jobs_dict = {}
@@ -636,7 +641,7 @@ def handler(json_jobs, playbook, raw_files):
     for starting_job_step in starting_jobs:
         job = jobs_dict[starting_job_step]
         # navigate through all the jobs and execute them in the right order
-        jobs(starting_job_step, jobs_dict, files, jobs_anwers_dict, playbook)
+        jobs(starting_job_step, jobs_dict, jobs_anwers_dict, playbook)
     
     # Print jobs_anwers_dict for testing purposes
     for job_step, answer in jobs_anwers_dict.items():
@@ -654,14 +659,13 @@ def analysis():
     Args:
         - json_jobs (JSON): The jobs of the playbook.
         - playbook (JSON): The Diastema playbook.
-        - raw_files (List): A list of the given files in the Diastema playbook form data.
 
     Returns:
         - responce (Responce): A responce to the central Diastema API Server containing information
             based on the analysis that has been requested.
     """
     # Get the JSON from the form-data
-    playbook = json.loads(request.form["json-playbook"])
+    playbook = request.json
     
     # Here there will probably be code to check the whole json
     # To return if there is a bad request
@@ -670,46 +674,8 @@ def analysis():
     if playbook["diastema-token"] != diastema_token:
         return Response('{"reason": "diastema token is wrong"}', status=401, mimetype='application/json')
     
-    # Get all the given files from the form-data
-    files = request.files
-    
     # Send the playbook for handling
-    handler(playbook["jobs"], playbook, files)
-    
-    """ Dummy Test
-    dummy_call = spark_api_host+"/v1/submissions/create"
-    dummy_headers = {'Content-Type': 'application/json;charset=UTF-8'}
-    dummy_job = "/root/spark-job/load-job.py"
-    dummy_appResource = "file:"+dummy_job
-    dummy_json = {
-        "appResource": dummy_appResource,
-        "sparkProperties": {
-            "spark.master": "local[*]",
-            "spark.eventLog.enabled": "false",
-            "spark.app.name": "Spark REST API - PI"
-        },
-        "clientSparkVersion": "3.1.2",
-        "mainClass": "org.apache.spark.deploy.SparkSubmit",
-        "environmentVariables": {
-            "SPARK_ENV_LOADED": "1"
-        },
-        "action": "CreateSubmissionRequest",
-        "appArgs": [ dummy_job ]
-    }
-    response = requests.post(dummy_call, json=dummy_json, headers=dummy_headers)
-    responce_json = response.json()
-    #print("JSON Responce")
-    #print(responce_json)
-    #print("The driver got was")
-    #print(responce_json["submissionId"])
-
-    dummy_call = spark_api_host+"/v1/submissions/status/"+responce_json["submissionId"]
-
-    response = requests.get(dummy_call)
-    responce_json = response.json()
-    #print("JSON Responce")
-    #print(responce_json)
-    Dummy Test """
+    handler(playbook["jobs"], playbook)
 
     # Contact front end for the ending of the analysis
     diastema_call(minioString(playbook["database-id"]), "analysis-"+minioString(playbook["analysis-id"]), "analysis")
@@ -792,7 +758,7 @@ def modelling():
 
 """ Flask endpoints - Dummy Diastema API Services Endpoint """
 # A dummy endpoint to represent the answer of the data loading and cleaning API Services
-@app.route("/data-loading-cleaning-api", methods=["POST"])
+@app.route("/", methods=["POST"])
 def data_loading_cleaning_api():
     print("Cleaning or loading is done")
     #formdata = request.form["minio-input"]
@@ -802,4 +768,4 @@ def data_loading_cleaning_api():
 """ Main """
 # Main code
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(HOST, PORT, True)
