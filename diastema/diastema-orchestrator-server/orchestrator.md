@@ -6,3 +6,4 @@
 docker build --tag orchestrator-server-image .
 docker run -d -p 0.0.0.0:5000:5000 --name orchestrator-server orchestrator-server-image
 ```
+You can use the '-e' tag to give environment variables in the docker container based on the given PY file
