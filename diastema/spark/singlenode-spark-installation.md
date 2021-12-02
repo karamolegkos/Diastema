@@ -1,6 +1,6 @@
 # Installing Singlenode Spark on Ubuntu
 
-This guide will show the steps to install the Spark framework in your ubuntu OS. The root privileges will be used, but for better safety you should better of use a normal user instead.
+This guide will show the steps to install the Spark framework in your ubuntu OS. The root privileges will be used, but for better safety you should better off use a normal user instead.
 
 ## Make your updates
 Run the following commands to update your machine.
