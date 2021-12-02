@@ -3,15 +3,15 @@
 This guide will show how to run a spark job on a kubernetes multinode cluster. Most of the examples that exist online, are actually in need of the reader to know about Google Clouds, AWS etc. In this guide there will more focus on how to run the job.
 - Kubernetes Master Node will be hosted here: 192.168.222.14:6443
 
-This guide is an extension of the official spark guide here [1].
+This guide is an extension of the official spark guide here [[1]](https://github.com/karamolegkos/Diastema/blob/main/diastema/spark-on-kubernetes/spark-on-kubernetes.md#references).
 
 ## Prerequisites
-- A running Kubernetes Cluster [2]
+- A running Kubernetes Cluster [[2]](https://github.com/karamolegkos/Diastema/blob/main/diastema/spark-on-kubernetes/spark-on-kubernetes.md#references)
 - A Docker image Registry (Dockerhub is ok also too)
-- Spark installed to use as a client machine [3]. It only need to be able to see the Kubernetes Master Host and IP as well as be able to make calls to them.
+- Spark installed to use as a client machine [[3]](https://github.com/karamolegkos/Diastema/blob/main/diastema/spark-on-kubernetes/spark-on-kubernetes.md#references). It only need to be able to see the Kubernetes Master Host and IP as well as be able to make calls to them.
 
 ## Make your spark job
-To make the spark job, we need firstly, to have an image including the spark framework inside of it. As described here [4], the 'docker-image-tool.sh' is able of building this image for us.
+To make the spark job, we need firstly, to have an image including the spark framework inside of it. As described here [[4]](https://github.com/karamolegkos/Diastema/blob/main/diastema/spark-on-kubernetes/spark-on-kubernetes.md#references), the 'docker-image-tool.sh' is able of building this image for us.
 
 After we have this image, we need to make our own image extending the image of the docker-image-tool.sh script.
 
