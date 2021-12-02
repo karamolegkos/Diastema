@@ -29,7 +29,7 @@ You should have an output like the one below.
 ```
 
 ## Download and Set Up Spark
-Download your preferred version of Spark from this link [[1]](https://github.com/karamolegkos/Diastema/edit/main/diastema/spark/singlenode-spark-installation.md#References) using wget.
+Download your preferred version of Spark from this link [[1]](https://github.com/karamolegkos/Diastema/blob/main/diastema/spark/singlenode-spark-installation.md#references) using wget.
 ```
 wget https://dlcdn.apache.org/spark/spark-3.2.0/spark-3.2.0-bin-hadoop3.2.tgz
 ```
