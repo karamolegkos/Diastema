@@ -29,6 +29,11 @@ spark-submit \
 local:///app/app.py
 ``` 
 
+If you need to find where is your kubernetes host. Type in the Kubernetes Master host the following:
+```
+kubectl cluster-info
+```
+
 # References
 - [1] https://spark.apache.org/docs/latest/running-on-kubernetes.html
 - [2] https://github.com/karamolegkos/Diastema/blob/main/diastema/kubernetes-cluster/kubernetes-cluster-installation.md
