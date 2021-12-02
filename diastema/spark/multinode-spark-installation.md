@@ -24,7 +24,7 @@ Below is an advised way of organising your directories for the installation.
 ```
 
 ## Install Spark v3+ with Hadoop v3.2+
-Now we will install Spark on all of the machines. Download your preferred version of Spark from this link [1] using wget.
+Now we will install Spark on all of the machines. Download your preferred version of Spark from this link [[1]](https://github.com/karamolegkos/Diastema/blob/main/diastema/spark/multinode-spark-installation.md#references) using wget.
 ```
 cd ~/downloads
 wget https://dlcdn.apache.org/spark/spark-3.1.2/spark-3.1.2-bin-hadoop3.2.tgz
