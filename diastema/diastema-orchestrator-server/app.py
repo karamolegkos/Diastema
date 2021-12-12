@@ -94,11 +94,11 @@ minio_client = Minio(
     )
 
 # Diastema Front End host
-diastema_front_end_host = "http://"+DIASTEMA_HOST+":"+str(DIASTEMA_PORT)
+diastema_front_end_host = "http://"+DIASTEMA_HOST+":"+str(DIASTEMA_PORT)+"/modelling"
 
 # Diastema Data Clean and Data Load Servcices
-diastema_data_loading_api_host = "http://"+DIASTEMA_DATA_LOADING_HOST+":"+str(DIASTEMA_DATA_LOADING_PORT)+"/"
-diastema_data_cleaning_api_host = "http://"+DIASTEMA_DATA_CLEANING_HOST+":"+str(DIASTEMA_DATA_CLEANING_PORT)+"/"
+diastema_data_loading_api_host = "http://"+DIASTEMA_DATA_LOADING_HOST+":"+str(DIASTEMA_DATA_LOADING_PORT)+"/data-loading"
+diastema_data_cleaning_api_host = "http://"+DIASTEMA_DATA_CLEANING_HOST+":"+str(DIASTEMA_DATA_CLEANING_PORT)+"/data-cleaning"
 
 """ Frequently used code """
 # Make a good MinIO String
@@ -134,23 +134,23 @@ def insertMongoRecord(mongo_db_client, mongo_db_analysis_collection, record):
     return
 
 # Contact Diastema Front-End for the ending of a job
-def diastema_call(db_id, analysis_id, job_name):
+def diastema_call(visualization_path, job_name):
     """
     This function is making an API request to the Diastema central API Server. 
     It will inform it for the end of a job, or the end of the whole analysis.
 
     Args:
-        - db_id (String): The user who needs to be informed.
-        - analysis_id (String): The analysis ID of the user.
+        - visualization_path (String): The path of the MinIO objects to be visualised.
         - job_name (String): A job name, or the "analysis" value.
 
     Returns:
         - Nothing
     """
-    url = diastema_front_end_host+"/modelling"
-    payload = {"database-id":db_id, "analysis-id":analysis_id, "job-name":job_name}
+    url = diastema_front_end_host
+    # payload = {"database-id":db_id, "analysis-id":analysis_id, "job-name":job_name}
+    payload = {"path": visualization_path, "job":job_name}
     requests.post(url, json=payload)
-    print("Contacted Diastema Front  End")
+    print("Contacted Diastema Front End")
     return
 
 """ Functions to call a spark job """
@@ -204,7 +204,10 @@ def job_caller(call_args):
         "sparkProperties": {
             "spark.master": "local[*]",
             "spark.eventLog.enabled": "false",
-            "spark.app.name": "Spark REST API - PI"
+            "spark.app.name": "Spark REST API - PI",
+            "spark.executorEnv.MINIO_HOST": MINIO_HOST,
+	        "spark.executorEnv.MINIO_USER": MINIO_USER,
+	        "spark.executorEnv.MINIO_PASS": MINIO_PASS
         },
         "clientSparkVersion": "3.1.2",
         "mainClass": "org.apache.spark.deploy.SparkSubmit",
@@ -241,7 +244,7 @@ def data_load(playbook, job, data_set_files):
 
     Args:
         - playbook (JSON): The Diastema playbook.
-        - job (JSON): The Data Loading Job from the Diastema playbook.
+        - job (JSON): This Data Loading Job from the Diastema playbook.
         - data_set_files (String): The path of the Data set files.
 
     Returns:
@@ -268,7 +271,7 @@ def data_load(playbook, job, data_set_files):
     insertMongoRecord(minioString(playbook["database-id"]), "analysis_"+minioString(playbook["analysis-id"]), data_load_job_record)
 
     # Contact front end for the ending of the job
-    diastema_call(minioString(playbook["database-id"]), "analysis-"+minioString(playbook["analysis-id"]), "data-load")
+    # diastema_call(minioString(playbook["database-id"]), "analysis-"+minioString(playbook["analysis-id"]), "data-load")
 
     # Return the bucket that this job made output to
     return load_bucket
@@ -283,7 +286,7 @@ def cleaning(playbook, job, last_bucket, max_shrink=False, json_schema=False):
 
     Args:
         - playbook (JSON): The Diastema playbook.
-        - job (JSON): The Data Loading Job from the Diastema playbook.
+        - job (JSON): This Data Cleaning Job from the Diastema playbook.
         - last_bucket (String): The path that the raw data are saved.
         - max_shrink (float): The maximm shrinking of the data set to be cleaned.
         - json_schema (JSON): A JSON schema for the data cleaning job.
@@ -330,7 +333,7 @@ def cleaning(playbook, job, last_bucket, max_shrink=False, json_schema=False):
     insertMongoRecord(minioString(playbook["database-id"]), "analysis_"+minioString(playbook["analysis-id"]), cleaning_job_record)
 
     # Contact front end for the ending of the job
-    diastema_call(minioString(playbook["database-id"]), "analysis-"+minioString(playbook["analysis-id"]), "cleaning")
+    # diastema_call(minioString(playbook["database-id"]), "analysis-"+minioString(playbook["analysis-id"]), "cleaning")
 
     # Return the bucket that this job made output to 
     return analysis_bucket
@@ -345,7 +348,7 @@ def classification(playbook, job, last_bucket, algorithm=False, tensorfow_algori
 
     Args:
         - playbook (JSON): The Diastema playbook.
-        - job (JSON): The Data Loading Job from the Diastema playbook.
+        - job (JSON): This Data Classification Job from the Diastema playbook.
         - last_bucket (String): The path that the non analyzed data are saved.
         - algorithm (String): The algorithm to run.
         - tensorfow_algorithm (String): A tensorflow algorithm to run.
@@ -355,13 +358,13 @@ def classification(playbook, job, last_bucket, algorithm=False, tensorfow_algori
     """
     # All the available spark classfication jobs 
     spark_files = {
-        "logistic regression" : "/root/diastema-jobs/classification/logistic_regression.py",
-        "decision tree classifier" : "/root/diastema-jobs/classification/decision_tree.py",
-        "random forest classifier" : "/root/diastema-jobs/classification/random_forest.py",
-        "gradient-boosted tree classifier" : "/root/spark-job/classification-job-4.py", # Not imported yet
-        "multilayer perceptron classifier" : "/root/spark-job/classification-job-5.py", # Not imported yet
-        "linear support vector machine" : "/root/spark-job/classification-job-6.py",    # Not imported yet
-        "support vector machine" : "/root/spark-job/classification-job-7.py"            # Not imported yet
+        "logistic regression" : "/root/diastema-daas-analytics-catalogue/src/classification/logistic_regression.py",
+        "decision tree classifier" : "/root/diastema-daas-analytics-catalogue/src/classification/decision_tree.py",
+        "random forest classifier" : "/root/diastema-daas-analytics-catalogue/src/classification/random_forest.py",
+        "gradient-boosted tree classifier" : "/root/diastema-daas-analytics-catalogue/src/classification/classification-job-4.py", # Not imported yet
+        "multilayer perceptron classifier" : "/root/diastema-daas-analytics-catalogue/src/classification/classification-job-5.py", # Not imported yet
+        "linear support vector machine" : "/root/diastema-daas-analytics-catalogue/src/classification/classification-job-6.py",    # Not imported yet
+        "support vector machine" : "/root/diastema-daas-analytics-catalogue/src/classification/classification-job-7.py"            # Not imported yet
     }
 
     # Gget the spark algorithm to run
@@ -386,16 +389,16 @@ def classification(playbook, job, last_bucket, algorithm=False, tensorfow_algori
 
     # Make the Spark call
     spark_caller(job_args)
-
+    
     # Remove the _SUCCESS file from the  spark job results
     minio_client.remove_object(minioString(playbook["database-id"]), "analysis-"+minioString(playbook["analysis-id"])+"/classified-"+minioString(job["step"])+"/_SUCCESS")
-
+    
     # Insert the classified data in MongoDB
     classification_job_record = {"minio-path":analysis_bucket, "directory-kind":"classified-data", "job-json":job}
     insertMongoRecord(minioString(playbook["database-id"]), "analysis_"+minioString(playbook["analysis-id"]), classification_job_record)
 
     # Contact front end for the ending of the job
-    diastema_call(minioString(playbook["database-id"]), "analysis-"+minioString(playbook["analysis-id"]), "classification")
+    # diastema_call(minioString(playbook["database-id"]), "analysis-"+minioString(playbook["analysis-id"]), "classification")
 
     # Return the bucket that this job made output to 
     return analysis_bucket
@@ -410,7 +413,7 @@ def regression(playbook, job, last_bucket, algorithm=False, tensorfow_algorithm=
 
     Args:
         - playbook (JSON): The Diastema playbook.
-        - job (JSON): The Data Loading Job from the Diastema playbook.
+        - job (JSON): This Data Regression Job from the Diastema playbook.
         - last_bucket (String): The path that the non analyzed data are saved.
         - algorithm (String): The algorithm to run.
         - tensorfow_algorithm (String): A tensorflow algorithm to run.
@@ -420,11 +423,11 @@ def regression(playbook, job, last_bucket, algorithm=False, tensorfow_algorithm=
     """
     # All the available spark regression jobs 
     spark_files = {
-        "linear regression" : "/root/diastema-jobs/regression/linear_regression.py",
-        "generalized linear regression" : "/root/spark-job/regression-job-2.py",        # Not imported yet
-        "decision tree regression" : "/root/diastema-jobs/regression/decision_tree.py",
-        "random forest regression" : "/root/diastema-jobs/regression/random_forest.py",
-        "gradient-boosted tree regression" : "/root/spark-job/regression-job-5.py"      # Not imported yet
+        "linear regression" : "/root/diastema-daas-analytics-catalogue/src/regression/linear_regression.py",
+        "generalized linear regression" : "/root/diastema-daas-analytics-catalogue/src/regression/regression-job-2.py",        # Not imported yet
+        "decision tree regression" : "/root/diastema-daas-analytics-catalogue/src/regression/decision_tree.py",
+        "random forest regression" : "/root/diastema-daas-analytics-catalogue/src/regression/random_forest.py",
+        "gradient-boosted tree regression" : "/root/diastema-daas-analytics-catalogue/src/regression/regression-job-5.py"      # Not imported yet
     }
 
     # Get the spark algorithm to run
@@ -457,7 +460,7 @@ def regression(playbook, job, last_bucket, algorithm=False, tensorfow_algorithm=
     insertMongoRecord(minioString(playbook["database-id"]), "analysis_"+minioString(playbook["analysis-id"]), regression_job_record)
 
     # Contact front end for the ending of the job
-    diastema_call(minioString(playbook["database-id"]), "analysis-"+minioString(playbook["analysis-id"]), "regression")
+    # diastema_call(minioString(playbook["database-id"]), "analysis-"+minioString(playbook["analysis-id"]), "regression")
 
     # Return the bucket that this job made output to 
     return analysis_bucket
@@ -472,7 +475,7 @@ def clustering(playbook, job, last_bucket, algorithm=False, tensorfow_algorithm=
 
     Args:
         - playbook (JSON): The Diastema playbook.
-        - job (JSON): The Data Loading Job from the Diastema playbook.
+        - job (JSON): This Data Clustering Job from the Diastema playbook.
         - last_bucket (String): The path that the non analyzed data are saved.
         - algorithm (String): The algorithm to run.
         - tensorfow_algorithm (String): A tensorflow algorithm to run.
@@ -482,11 +485,11 @@ def clustering(playbook, job, last_bucket, algorithm=False, tensorfow_algorithm=
     """
     # All the available spark clustering jobs 
     spark_files = {
-        "k-means clustering" : "/root/diastema-jobs/clustering/kmeans.py",
-        "generalized linear regression" : "/root/spark-job/clustering-job-2.py",   # Not imported yet
-        "decision tree regression" : "/root/spark-job/clustering-job-3.py",        # Not imported yet
-        "random forest regression" : "/root/spark-job/clustering-job-4.py",        # Not imported yet
-        "gradient-boosted tree regression" : "/root/spark-job/clustering-job-5.py" # Not imported yet
+        "k-means clustering" : "/root/diastema-daas-analytics-catalogue/src/clustering/kmeans.py",
+        "generalized linear regression" : "/root/diastema-daas-analytics-catalogue/src/clustering/clustering-job-2.py",   # Not imported yet
+        "decision tree regression" : "/root/diastema-daas-analytics-catalogue/src/clustering/clustering-job-3.py",        # Not imported yet
+        "random forest regression" : "/root/diastema-daas-analytics-catalogue/src/clustering/clustering-job-4.py",        # Not imported yet
+        "gradient-boosted tree regression" : "/root/diastema-daas-analytics-catalogue/src/clustering/clustering-job-5.py" # Not imported yet
     }
 
     # Get the spark algorithm to run
@@ -519,7 +522,7 @@ def clustering(playbook, job, last_bucket, algorithm=False, tensorfow_algorithm=
     insertMongoRecord(minioString(playbook["database-id"]), "analysis_"+minioString(playbook["analysis-id"]), clustering_job_record)
 
     # Contact front end for the ending of the job
-    diastema_call(minioString(playbook["database-id"]), "analysis-"+minioString(playbook["analysis-id"]), "clustering")
+    # diastema_call(minioString(playbook["database-id"]), "analysis-"+minioString(playbook["analysis-id"]), "clustering")
 
     # Return the bucket that this job made output to 
     return analysis_bucket
@@ -531,17 +534,34 @@ def visualize(playbook, job, last_bucket):
 
     Args:
         - playbook (JSON): The Diastema playbook.
-        - job (JSON): The Data Loading Job from the Diastema playbook.
-        - last_bucket (String): The path that the non analyzed data are saved.
+        - job (JSON): This Data Visualization Job from the Diastema playbook.
+        - last_bucket (String): The path that the data to be visualised are saved.
 
     Returns:
         - testing-value (String): A value that will have a perpose after the Diastema visualization framework is ready.
     """
-    print("There has not been any confirmation of what to give to the front-end yet!")
+    # The Data to be visualised are saved in the bucket below
+    visualization_path = last_bucket
 
-    # Contact front end for the ending of the job
-    diastema_call(minioString(playbook["database-id"]), "analysis-"+minioString(playbook["analysis-id"]), "visualization")
-
+    # Get the job kind based in the Diastema JSON playbook
+    broke_bucket = visualization_path.split("/")
+    job_done = broke_bucket[2].split("-")[0]
+    job_kind = ""
+    if(job_done == "loaded"):
+        job_kind = "data-load"
+    elif(job_done == "cleaned"):
+        job_kind = "cleaning"
+    elif(job_done == "classified"):
+        job_kind = "classification"
+    elif(job_done == "regressed"):
+        job_kind = "regression"
+    else:
+        job_kind = "clustering"
+    
+    # Contact front end to make a visualization
+    diastema_call(last_bucket, job_kind)
+    
+    # dummy return
     return "visualization-from: "+last_bucket
 
 """ Functions used for the json handling """
@@ -678,7 +698,7 @@ def analysis():
     handler(playbook["jobs"], playbook)
 
     # Contact front end for the ending of the analysis
-    diastema_call(minioString(playbook["database-id"]), "analysis-"+minioString(playbook["analysis-id"]), "analysis")
+    diastema_call(minioString(playbook["database-id"])+"/analysis-"+minioString(playbook["analysis-id"]), "analysis")
 
     # The analysis has been accepted
     return Response(status=202)
@@ -757,10 +777,18 @@ def modelling():
     return Response(status=200, mimetype='application/json')
 
 """ Flask endpoints - Dummy Diastema API Services Endpoint """
-# A dummy endpoint to represent the answer of the data loading and cleaning API Services
-@app.route("/", methods=["POST"])
-def data_loading_cleaning_api():
-    print("Cleaning or loading is done")
+# A dummy endpoint to represent the answer of the data loading API Service
+@app.route("/data-loading", methods=["POST"])
+def data_loading_api():
+    print("Loading is done")
+    #formdata = request.form["minio-input"]
+    #print(formdata)
+    return Response(status=200, mimetype='application/json')
+
+# A dummy endpoint to represent the answer of the data cleaning API Service
+@app.route("/data-cleaning", methods=["POST"])
+def data_cleaning_api():
+    print("Cleaning is done")
     #formdata = request.form["minio-input"]
     #print(formdata)
     return Response(status=200, mimetype='application/json')
