@@ -779,7 +779,8 @@ def analysis(sid, data):
     """
     # Get the JSON from the client
     # playbook = f"\n\n\nClient {sid} has spoken with {data['analysis']}\n\n\n"
-    playbook = json.loads(data['analysis'])
+    # playbook = json.loads(data['analysis'])
+    playbook = data['analysis']
     
     # Here there will probably be code to check the whole json
     # To return if there is a bad request
