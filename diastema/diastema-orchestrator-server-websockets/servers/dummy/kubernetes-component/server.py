@@ -48,7 +48,7 @@ def spark_call(msg):
     cmd += '--conf spark.executorEnv.MINIO_PASS="'+json_attrs["minio-pass"]+'" '
     cmd += '--conf spark.app.name='+json_attrs["app-name"]+' '
     cmd += '--conf spark.kubernetes.authenticate.driver.serviceAccountName=spark '
-    cmd += '--conf spark.kubernetes.container.image=docker.io/konvoulgaris/diastema-daas-analytics-catalogue:latest '
+    cmd += '--conf spark.kubernetes.container.image=docker.io/konvoulgaris/diastema-daas-analytics-catalogue:dev '
     cmd += json_attrs["path"]+' '
     cmd += json_attrs["algorithm"]+' '
     cmd += json_attrs["minio-input"]+' '

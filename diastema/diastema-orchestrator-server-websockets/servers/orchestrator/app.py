@@ -236,7 +236,7 @@ def spark_caller(call_args):
 
 """ Spark Jobs And Diastema API Jobs """
 # Data load job
-def data_load(playbook, job, data_set_files, sioC):
+def data_load(playbook, job, data_set_files):
     """
     A function to handle a Data Loading Job from the Diastema JSON playbook.
     It will setup the folders needed for the spark jobs in the MinIO Database.
@@ -266,7 +266,8 @@ def data_load(playbook, job, data_set_files, sioC):
 
     # Make websocket call for the Data Loading Service
     form_data = {"minio-input": raw_bucket, "minio-output": load_bucket, "job-id":minioString(job["id"])}
-    sioC.emit("data-loading", form_data) # Call Data loading
+    url = "http://"+DIASTEMA_DATA_LOADING_HOST+":"+str(DIASTEMA_DATA_LOADING_PORT)+"/loading"
+    resp = requests.post(url, json=form_data)
     
     # Wait to end the Data Loading job
     waitForJob(minioString(job["id"]))
@@ -285,7 +286,7 @@ def data_load(playbook, job, data_set_files, sioC):
     return load_bucket
 
 # Cleaning job
-def cleaning(playbook, job, last_bucket, sioC, max_shrink=False, json_schema=False):
+def cleaning(playbook, job, last_bucket, max_shrink=False, json_schema=False):
     """
     A function to handle a Data Cleaning Job from the Diastema JSON playbook.
     It will setup the folders needed for the spark jobs in the MinIO Database.
@@ -329,7 +330,8 @@ def cleaning(playbook, job, last_bucket, sioC, max_shrink=False, json_schema=Fal
     if max_shrink != False:
         form_data["max-shrink"] = max_shrink
 
-    sioC.emit("data-cleaning", form_data) # Call data cleaning
+    url = "http://"+DIASTEMA_DATA_LOADING_HOST+":"+str(DIASTEMA_DATA_LOADING_PORT)+"/cleaning"
+    resp = requests.post(url, json=form_data)
 
     # Wait to end the Data Cleaning job
     waitForJob(minioString(job["id"]))
@@ -621,7 +623,7 @@ def visualize(playbook, job, last_bucket):
 
 """ Functions used for the json handling """
 # Request a job
-def job_requestor(job_json, jobs_anwers_dict, playbook, sioC):
+def job_requestor(job_json, jobs_anwers_dict, playbook):
     """
     A function to handle a Vizualization Job from the Diastema JSON playbook.
 
@@ -639,10 +641,10 @@ def job_requestor(job_json, jobs_anwers_dict, playbook, sioC):
     from_step = job_json["from"]
     
     if(title == "data-load"):
-        jobs_anwers_dict[step] = data_load(playbook, job_json, job_json["files"], sioC)
+        jobs_anwers_dict[step] = data_load(playbook, job_json, job_json["files"])
     
     if(title == "cleaning"):
-        jobs_anwers_dict[step] = cleaning(playbook, job_json, jobs_anwers_dict[from_step], sioC, max_shrink = job_json["max-shrink"])
+        jobs_anwers_dict[step] = cleaning(playbook, job_json, jobs_anwers_dict[from_step], max_shrink = job_json["max-shrink"])
     
     if(title == "classification"):
         jobs_anwers_dict[step] = classification(playbook, job_json, jobs_anwers_dict[from_step], algorithm = job_json["algorithm"])
@@ -659,7 +661,7 @@ def job_requestor(job_json, jobs_anwers_dict, playbook, sioC):
     return
 
 # Access jobs by viewing them Depth-first O(N)
-def jobs(job_step, jobs_dict, jobs_anwers_dict, playbook, sioC):
+def jobs(job_step, jobs_dict, jobs_anwers_dict, playbook):
     """
     A Depth first recursive function, running every job of the Diastema analysis.
 
@@ -674,17 +676,17 @@ def jobs(job_step, jobs_dict, jobs_anwers_dict, playbook, sioC):
         - Nothing.
     """
     # Make the job request
-    job_requestor(jobs_dict[job_step], jobs_anwers_dict, playbook, sioC)
+    job_requestor(jobs_dict[job_step], jobs_anwers_dict, playbook)
     
     # Depth-first approach
     next_steps = jobs_dict[job_step]["next"]
     for step in next_steps:
         if(step != 0):  # If ther is no next job then do not try to go deeper
-            jobs(step, jobs_dict, jobs_anwers_dict, playbook, sioC)
+            jobs(step, jobs_dict, jobs_anwers_dict, playbook)
     return
 
 # Handle the playbook
-def handler(json_jobs, playbook, sioC):
+def handler(json_jobs, playbook):
     """
     A function to handle and run the Diastema playbook.
 
@@ -716,7 +718,7 @@ def handler(json_jobs, playbook, sioC):
     for starting_job_step in starting_jobs:
         job = jobs_dict[starting_job_step]
         # navigate through all the jobs and execute them in the right order
-        jobs(starting_job_step, jobs_dict, jobs_anwers_dict, playbook, sioC)
+        jobs(starting_job_step, jobs_dict, jobs_anwers_dict, playbook)
     
     # Print jobs_anwers_dict for testing purposes
     for job_step, answer in jobs_anwers_dict.items():
@@ -744,23 +746,25 @@ def catch_all(event, sid, data):
     return
 
 """ Socket-io Loading-Cleaning done Events """
-@sio.on("data-loading-done")
-def data_loading_done(sid, data):
+@app.route("/data-loading-done", methods=["POST"])
+def data_loading_done():
+    data = request.json
     # Get the job that is done
     job_id = data["job-id"]
     # Remove job from running jobs
     del running_jobs[job_id]
     print("I GOT THAT LOADING IS DONE")
-    return
+    return Response(status=200)
 
-@sio.on("data-cleaning-done")
-def data_cleaning_done(sid, data):
+@app.route("/data-cleaning-done", methods=["POST"])
+def data_cleaning_done():
+    data = request.json
     # Get the job that is done
     job_id = data["job-id"]
     # Remove job from running jobs
     del running_jobs[job_id]
     print("I GOT THAT CLEANING IS DONE")
-    return
+    return Response(status=200)
 
 """ Socket-io Analysis Events """
 # An event for handling and using the JSON playbook
@@ -788,15 +792,9 @@ def analysis(sid, data):
     # check if diastema token is right
     if playbook["diastema-token"] != diastema_token:
         return
-    
-    # Initiate Socket IO client
-    sioC = socketio.Client()
-
-    # Connect to Diastema Services
-    sioC.connect("http://"+DIASTEMA_DATA_LOADING_HOST+":"+str(DIASTEMA_DATA_LOADING_PORT))
 
     # Send the playbook for handling
-    handler(playbook["jobs"], playbook, sioC)
+    handler(playbook["jobs"], playbook)
 
     # Insert metadata in mongo
     metadata_json = playbook["metadata"]
@@ -806,9 +804,6 @@ def analysis(sid, data):
     # Contact front end for the ending of the analysis
     # diastema_call(minioString(playbook["database-id"])+"/analysis-"+minioString(playbook["analysis-id"]), "analysis")
     diastema_call(message = "update", update = ("Analysis completed with ID: "+minioString(playbook["analysis-id"])))
-
-    # Disconnect from Diastema Services
-    sioC.disconnect()
     return 
 
 """ Main """
